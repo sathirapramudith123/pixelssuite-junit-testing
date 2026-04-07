@@ -58,6 +58,19 @@ public class PixelsSuiteTestNG {
 		Assert.assertTrue(links.size()>0, "No links found on the homepage");
 	}
 	
+	@Test(priority = 3)
+	public void verifyNavigationLinkClickable() {
+	    driver.get("https://www.pixelssuite.com/");
+
+	    WebElement firstLink = wait.until(ExpectedConditions.elementToBeClickable(By.tagName("a")));
+	    String linkText = firstLink.getText();
+
+	    System.out.println("Clicking link: " + linkText);
+	    firstLink.click();
+
+	    Assert.assertTrue(driver.getCurrentUrl().length() > 0, "Navigation failed");
+	}
+	
 	@AfterMethod
 	public void tearDown() {
 		if(driver != null) {
