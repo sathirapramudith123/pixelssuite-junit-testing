@@ -3,13 +3,17 @@
 <suite name="Failed suite [Default suite]" guice-stage="DEVELOPMENT">
   <test thread-count="5" name="Default test(failed)">
     <classes>
-      <class name="MoreTools">
+      <class name="ResizeToolsUITest">
         <methods>
-          <include name="tearDown"/>
+          <include name="TC07_verifyImageEnlargerInvalidUpload"/>
           <include name="setUp"/>
-          <include name="verifyImageToTextPageUI"/>
+          <include name="TC03_verifyResizeImageInvalidUpload"/>
+          <include name="TC02_verifyResizeImageValidUpload"/>
+          <include name="tearDown"/>
+          <include name="TC12_verifyBulkResizeProcessButtonVisible"/>
+          <include name="TC06_verifyImageEnlargerValidUpload"/>
         </methods>
-      </class> <!-- MoreTools -->
+      </class> <!-- ResizeToolsUITest -->
     </classes>
   </test> <!-- Default test(failed) -->
 </suite> <!-- Failed suite [Default suite] -->

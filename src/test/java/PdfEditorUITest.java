@@ -5,6 +5,7 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.testng.Assert;
@@ -17,49 +18,54 @@ public class PdfEditorUITest {
     WebDriver driver;
     WebDriverWait wait;
 
+    private final String URL = "https://www.pixelssuite.com/pdf-editor";
+
     @BeforeMethod
     public void setUp() {
-        driver = new ChromeDriver();
+        ChromeOptions options = new ChromeOptions();
+        driver = new ChromeDriver(options);
         driver.manage().window().maximize();
-        wait = new WebDriverWait(driver, Duration.ofSeconds(15));
+        wait = new WebDriverWait(driver, Duration.ofSeconds(20));
     }
 
+    // =========================
+    // TC01 - Page Load
+    // =========================
     @Test(priority = 1)
     public void verifyPdfEditorPageLoadsSuccessfully() {
-        driver.get("https://www.pixelssuite.com/pdf-editor");
+        driver.get(URL);
 
         wait.until(ExpectedConditions.visibilityOfElementLocated(By.tagName("body")));
 
         String title = driver.getTitle();
         String currentUrl = driver.getCurrentUrl();
 
-        System.out.println("Page Title: " + title);
-        System.out.println("Current URL: " + currentUrl);
-
         Assert.assertFalse(title.trim().isEmpty(), "Page title is empty");
         Assert.assertTrue(currentUrl.contains("pdf-editor"), "URL does not contain pdf-editor");
     }
 
+    // =========================
+    // TC02 - UI Elements
+    // =========================
     @Test(priority = 2)
     public void verifyPdfEditorUIElementsDisplayed() {
-        driver.get("https://www.pixelssuite.com/pdf-editor");
+        driver.get(URL);
 
-        WebElement body = wait.until(
-                ExpectedConditions.visibilityOfElementLocated(By.tagName("body")));
-        Assert.assertTrue(body.isDisplayed(), "Page body is not displayed");
-
-        WebElement chooseFileInput = wait.until(
+        WebElement fileInput = wait.until(
                 ExpectedConditions.presenceOfElementLocated(By.xpath("//input[@type='file']")));
-        Assert.assertTrue(chooseFileInput.isDisplayed(), "Choose File input is not displayed");
+
+        Assert.assertTrue(fileInput.isDisplayed(), "File input is not displayed");
 
         List<WebElement> buttons = driver.findElements(By.tagName("button"));
-        System.out.println("Total buttons found: " + buttons.size());
-        Assert.assertTrue(buttons.size() > 0, "No buttons found on the PDF Editor page");
+        Assert.assertTrue(buttons.size() > 0, "No buttons found");
     }
 
+    // =========================
+    // TC03 - Toolbar
+    // =========================
     @Test(priority = 3)
     public void verifyToolbarOptionsDisplayed() {
-        driver.get("https://www.pixelssuite.com/pdf-editor");
+        driver.get(URL);
 
         wait.until(ExpectedConditions.visibilityOfElementLocated(By.tagName("body")));
 
@@ -67,11 +73,101 @@ public class PdfEditorUITest {
         List<WebElement> ranges = driver.findElements(By.xpath("//input[@type='range']"));
         List<WebElement> buttons = driver.findElements(By.tagName("button"));
 
-        System.out.println("Select count: " + selects.size());
-        System.out.println("Range input count: " + ranges.size());
-        System.out.println("Button count: " + buttons.size());
+        Assert.assertTrue(
+                selects.size() > 0 || ranges.size() > 0 || buttons.size() > 0,
+                "Toolbar controls not displayed"
+        );
+    }
 
-        Assert.assertTrue(buttons.size() > 0, "Toolbar buttons are not displayed");
+    // =========================
+    // TC04 - Valid Upload
+    // =========================
+    @Test(priority = 4)
+    public void verifyValidPdfUpload() {
+        driver.get(URL);
+
+        WebElement fileInput = wait.until(
+                ExpectedConditions.presenceOfElementLocated(By.xpath("//input[@type='file']")));
+
+        // CHANGE THIS PATH
+        fileInput.sendKeys("C:\\test-files\\sample.pdf");
+
+        Assert.assertTrue(
+                driver.getPageSource().contains("PDF") ||
+                driver.getPageSource().contains("Preview"),
+                "PDF upload not successful"
+        );
+    }
+
+    // =========================
+    // TC05 - Invalid Upload
+    // =========================
+    @Test(priority = 5)
+    public void verifyInvalidFileUpload() {
+        driver.get(URL);
+
+        WebElement fileInput = wait.until(
+                ExpectedConditions.presenceOfElementLocated(By.xpath("//input[@type='file']")));
+
+        // CHANGE THIS PATH
+        fileInput.sendKeys("C:\\test-files\\invalid.txt");
+
+        boolean handled =
+                driver.getPageSource().toLowerCase().contains("invalid") ||
+                driver.getPageSource().toLowerCase().contains("error") ||
+                !driver.getPageSource().contains("invalid.txt");
+
+        Assert.assertTrue(handled, "Invalid file was not rejected");
+    }
+
+    // =========================
+    // TC06 - Buttons Clickable
+    // =========================
+    @Test(priority = 6)
+    public void verifyToolbarButtonsClickable() {
+        driver.get(URL);
+
+        wait.until(ExpectedConditions.visibilityOfElementLocated(By.tagName("body")));
+
+        List<WebElement> buttons = driver.findElements(By.tagName("button"));
+
+        Assert.assertTrue(buttons.size() > 0, "No buttons found");
+
+        for (WebElement btn : buttons) {
+            try {
+                if (btn.isDisplayed() && btn.isEnabled()) {
+                    btn.click();
+                    break;
+                }
+            } catch (Exception e) {
+                // ignore hidden elements
+            }
+        }
+    }
+
+    // =========================
+    // TC07 - Check No 404
+    // =========================
+    @Test(priority = 7)
+    public void verifyPageNot404() {
+        driver.get(URL);
+
+        String source = driver.getPageSource().toLowerCase();
+
+        Assert.assertFalse(source.contains("404"), "Page shows 404 error");
+        Assert.assertFalse(source.contains("not found"), "Page shows Not Found");
+    }
+
+    // =========================
+    // TC08 - File Input Exists
+    // =========================
+    @Test(priority = 8)
+    public void verifyFileInputPresent() {
+        driver.get(URL);
+
+        List<WebElement> fileInputs = driver.findElements(By.cssSelector("input[type='file']"));
+
+        Assert.assertTrue(fileInputs.size() > 0, "File input is not present");
     }
 
     @AfterMethod

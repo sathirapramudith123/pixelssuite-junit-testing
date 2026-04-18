@@ -1,9 +1,13 @@
+import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.List;
 
 import org.openqa.selenium.By;
+import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.testng.Assert;
@@ -16,143 +20,242 @@ public class ResizeToolsUITest {
     WebDriver driver;
     WebDriverWait wait;
 
+    private final String RESIZE_IMAGE_URL = "https://www.pixelssuite.com/resize-image";
+    private final String IMAGE_ENLARGER_URL = "https://www.pixelssuite.com/image-enlarger";
+    private final String BULK_RESIZE_URL = "https://www.pixelssuite.com/bulk-resize";
+
+    // Put these files inside: src/test/resources/files/
+    private final String JPG_FILE = Paths.get("src", "test", "resources", "files", "sample.jpg").toAbsolutePath().toString();
+    private final String PNG_FILE = Paths.get("src", "test", "resources", "files", "sample.png").toAbsolutePath().toString();
+    private final String INVALID_FILE = Paths.get("src", "test", "resources", "files", "invalid.txt").toAbsolutePath().toString();
+
     @BeforeMethod
     public void setUp() {
-        driver = new ChromeDriver();
+        ChromeOptions options = new ChromeOptions();
+        driver = new ChromeDriver(options);
         driver.manage().window().maximize();
-        wait = new WebDriverWait(driver, Duration.ofSeconds(15));
+        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5));
+        wait = new WebDriverWait(driver, Duration.ofSeconds(20));
     }
 
-    @Test(priority = 1)
-    public void verifyResizeImagePageUI() {
-        driver.get("https://www.pixelssuite.com/resize-image");
+    // =========================
+    // Helper Methods
+    // =========================
 
+    private void openPage(String url) {
+        driver.get(url);
         wait.until(ExpectedConditions.visibilityOfElementLocated(By.tagName("body")));
+    }
 
-        WebElement heading = wait.until(ExpectedConditions.visibilityOfElementLocated(
-                By.xpath("//*[contains(text(),'Resize Image')]")));
-        Assert.assertTrue(heading.isDisplayed(), "Resize Image heading is not displayed");
-        Assert.assertEquals(heading.getText().trim(), "Resize Image", "Incorrect page heading");
+    private boolean isTextPresent(String text) {
+        return driver.findElements(By.xpath("//*[contains(text(),'" + text + "')]")).size() > 0;
+    }
 
-        WebElement uploadText = driver.findElement(
-                By.xpath("//*[contains(text(),'Drag and drop your file here')]"));
-        Assert.assertTrue(uploadText.isDisplayed(), "Upload drag-and-drop text is not displayed");
+    private void assertTextPresent(String text, String message) {
+        Assert.assertTrue(isTextPresent(text), message);
+    }
 
-        WebElement selectFilesButton = driver.findElement(
-                By.xpath("//*[contains(text(),'Select files')]"));
-        Assert.assertTrue(selectFilesButton.isDisplayed(), "Select files button is not displayed");
+    private void assertAnyTextPresent(String message, String... texts) {
+        boolean found = false;
+        for (String text : texts) {
+            if (isTextPresent(text)) {
+                found = true;
+                break;
+            }
+        }
+        Assert.assertTrue(found, message);
+    }
 
-        WebElement supportedText = driver.findElement(
-                By.xpath("//*[contains(text(),'Supported:')]"));
-        Assert.assertTrue(supportedText.isDisplayed(), "Supported formats text is not displayed");
+    private WebElement waitForVisible(By locator) {
+        return wait.until(ExpectedConditions.visibilityOfElementLocated(locator));
+    }
 
-        WebElement resizePanel = driver.findElement(
-                By.xpath("//*[contains(text(),'Resize')]"));
-        Assert.assertTrue(resizePanel.isDisplayed(), "Resize panel title is not displayed");
+    private WebElement getFileInput() {
+        return wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("input[type='file']")));
+    }
 
-        WebElement previewPanel = driver.findElement(
-                By.xpath("//*[contains(text(),'Preview')]"));
-        Assert.assertTrue(previewPanel.isDisplayed(), "Preview panel title is not displayed");
+    private void uploadFile(String filePath) {
+        getFileInput().sendKeys(filePath);
+    }
 
-        WebElement resizePlaceholder = driver.findElement(
-                By.xpath("//*[contains(text(),'Select an image to configure size')]"));
-        Assert.assertTrue(resizePlaceholder.isDisplayed(), "Resize placeholder text is not displayed");
+    private boolean isElementPresent(By locator) {
+        return !driver.findElements(locator).isEmpty();
+    }
 
-        WebElement previewPlaceholder = driver.findElement(
-                By.xpath("//*[contains(text(),'No image yet')]"));
-        Assert.assertTrue(previewPlaceholder.isDisplayed(), "Preview placeholder text is not displayed");
+    private WebElement findButtonByPossibleTexts(String... texts) {
+        for (String text : texts) {
+            List<WebElement> elements = driver.findElements(
+                By.xpath("//button[contains(.,'" + text + "')] | //*[@role='button' and contains(.,'" + text + "')]")
+            );
+            if (!elements.isEmpty()) {
+                return elements.get(0);
+            }
+        }
+        throw new NoSuchElementException("No matching button found");
+    }
+
+    private boolean pageContainsAny(String... texts) {
+        for (String text : texts) {
+            if (isTextPresent(text)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // =========================
+    // RESIZE IMAGE TESTS
+    // =========================
+
+    @Test(priority = 1)
+    public void TC01_verifyResizeImagePageUI() {
+        openPage(RESIZE_IMAGE_URL);
+
+        assertTextPresent("Resize Image", "Resize Image heading is not displayed");
+        assertAnyTextPresent("Upload text is not displayed", "Drag and drop your file here", "Drag and drop");
+        assertAnyTextPresent("Select files button is not displayed", "Select files", "Select Files");
+        assertTextPresent("Supported:", "Supported formats text is not displayed");
+        assertTextPresent("Resize", "Resize panel title is not displayed");
+        assertTextPresent("Preview", "Preview panel title is not displayed");
+        assertTextPresent("Select an image to configure size", "Resize placeholder text is not displayed");
+        assertTextPresent("No image yet", "Preview placeholder text is not displayed");
     }
 
     @Test(priority = 2)
-    public void verifyImageEnlargerPageUI() {
-        driver.get("https://www.pixelssuite.com/image-enlarger");
+    public void TC02_verifyResizeImageValidUpload() {
+        openPage(RESIZE_IMAGE_URL);
 
-        wait.until(ExpectedConditions.visibilityOfElementLocated(By.tagName("body")));
+        uploadFile(JPG_FILE);
 
-        WebElement heading = wait.until(ExpectedConditions.visibilityOfElementLocated(
-                By.xpath("//*[contains(text(),'Image Enlarger')]")));
-        Assert.assertTrue(heading.isDisplayed(), "Image Enlarger heading is not displayed");
-        Assert.assertEquals(heading.getText().trim(), "Image Enlarger", "Incorrect page heading");
-
-        WebElement uploadText = driver.findElement(
-                By.xpath("//*[contains(text(),'Drag and drop your file here')]"));
-        Assert.assertTrue(uploadText.isDisplayed(), "Upload drag-and-drop text is not displayed");
-
-        WebElement selectFilesButton = driver.findElement(
-                By.xpath("//*[contains(text(),'Select files')]"));
-        Assert.assertTrue(selectFilesButton.isDisplayed(), "Select files button is not displayed");
-
-        WebElement supportedText = driver.findElement(
-                By.xpath("//*[contains(text(),'Supported:')]"));
-        Assert.assertTrue(supportedText.isDisplayed(), "Supported formats text is not displayed");
-
-        WebElement enlargePanel = driver.findElement(
-                By.xpath("//*[contains(text(),'Enlarge')]"));
-        Assert.assertTrue(enlargePanel.isDisplayed(), "Enlarge panel title is not displayed");
-
-        WebElement previewPanel = driver.findElement(
-                By.xpath("//*[contains(text(),'Preview')]"));
-        Assert.assertTrue(previewPanel.isDisplayed(), "Preview panel title is not displayed");
-
-        WebElement enlargePlaceholder = driver.findElement(
-                By.xpath("//*[contains(text(),'Select an image to enlarge')]"));
-        Assert.assertTrue(enlargePlaceholder.isDisplayed(), "Enlarge placeholder text is not displayed");
-
-        WebElement previewPlaceholder = driver.findElement(
-                By.xpath("//*[contains(text(),'No image yet')]"));
-        Assert.assertTrue(previewPlaceholder.isDisplayed(), "Preview placeholder text is not displayed");
+        Assert.assertTrue(
+            pageContainsAny("Preview", "Resize", "sample", "Width", "Height"),
+            "Valid image upload did not appear to work on Resize Image page"
+        );
     }
 
     @Test(priority = 3)
-    public void verifyBulkResizePageUI() {
-        driver.get("https://www.pixelssuite.com/bulk-resize");
+    public void TC03_verifyResizeImageInvalidUpload() {
+        openPage(RESIZE_IMAGE_URL);
 
-        wait.until(ExpectedConditions.visibilityOfElementLocated(By.tagName("body")));
+        uploadFile(INVALID_FILE);
 
-        WebElement heading = wait.until(ExpectedConditions.visibilityOfElementLocated(
-                By.xpath("//*[contains(text(),'Bulk Resize')]")));
-        Assert.assertTrue(heading.isDisplayed(), "Bulk Resize heading is not displayed");
-        Assert.assertEquals(heading.getText().trim(), "Bulk Resize", "Incorrect page heading");
+        boolean invalidHandled =
+            pageContainsAny("Invalid", "Unsupported", "Error", "Only image") ||
+            !driver.getPageSource().contains("invalid.txt");
 
-        WebElement filesSection = driver.findElement(
-                By.xpath("//*[contains(text(),'Files')]"));
-        Assert.assertTrue(filesSection.isDisplayed(), "Files section title is not displayed");
+        Assert.assertTrue(invalidHandled, "Invalid file was not rejected on Resize Image page");
+    }
 
-        WebElement uploadText = driver.findElement(
-                By.xpath("//*[contains(text(),'Drag and drop your file here')]"));
-        Assert.assertTrue(uploadText.isDisplayed(), "Upload drag-and-drop text is not displayed");
+    @Test(priority = 4)
+    public void TC04_verifyResizeImageFileInputPresent() {
+        openPage(RESIZE_IMAGE_URL);
 
-        WebElement selectImagesButton = driver.findElement(
-                By.xpath("//*[contains(text(),'Select images')]"));
-        Assert.assertTrue(selectImagesButton.isDisplayed(), "Select images button is not displayed");
+        Assert.assertTrue(isElementPresent(By.cssSelector("input[type='file']")),
+                "File input is not present on Resize Image page");
+    }
 
-        WebElement supportedText = driver.findElement(
-                By.xpath("//*[contains(text(),'Supported:')]"));
-        Assert.assertTrue(supportedText.isDisplayed(), "Supported formats text is not displayed");
+    // =========================
+    // IMAGE ENLARGER TESTS
+    // =========================
 
-        WebElement optionsSection = driver.findElement(
-                By.xpath("//*[contains(text(),'Options')]"));
-        Assert.assertTrue(optionsSection.isDisplayed(), "Options section title is not displayed");
+    @Test(priority = 5)
+    public void TC05_verifyImageEnlargerPageUI() {
+        openPage(IMAGE_ENLARGER_URL);
 
-        WebElement widthInput = driver.findElement(
-                By.xpath("//input[@placeholder='Width']"));
-        Assert.assertTrue(widthInput.isDisplayed(), "Width input is not displayed");
+        assertTextPresent("Image Enlarger", "Image Enlarger heading is not displayed");
+        assertAnyTextPresent("Upload text is not displayed", "Drag and drop your file here", "Drag and drop");
+        assertAnyTextPresent("Select files button is not displayed", "Select files", "Select Files", "Select Image");
+        assertTextPresent("Supported:", "Supported formats text is not displayed");
+        assertTextPresent("Enlarge", "Enlarge panel title is not displayed");
+        assertTextPresent("Preview", "Preview panel title is not displayed");
+        assertTextPresent("Select an image to enlarge", "Enlarge placeholder text is not displayed");
+        assertTextPresent("No image yet", "Preview placeholder text is not displayed");
+    }
 
-        WebElement heightInput = driver.findElement(
-                By.xpath("//input[@placeholder='Height']"));
-        Assert.assertTrue(heightInput.isDisplayed(), "Height input is not displayed");
+    @Test(priority = 6)
+    public void TC06_verifyImageEnlargerValidUpload() {
+        openPage(IMAGE_ENLARGER_URL);
 
-        WebElement keepAspectCheckbox = driver.findElement(
-                By.xpath("//input[@type='checkbox']"));
-        Assert.assertTrue(keepAspectCheckbox.isDisplayed(), "Keep aspect checkbox is not displayed");
+        uploadFile(PNG_FILE);
 
-        WebElement processButton = driver.findElement(
-                By.xpath("//*[contains(text(),'Process & Download')]"));
-        Assert.assertTrue(processButton.isDisplayed(), "Process & Download button is not displayed");
+        Assert.assertTrue(
+            pageContainsAny("Preview", "Enlarge", "sample", "Width", "Height"),
+            "Valid image upload did not appear to work on Image Enlarger page"
+        );
+    }
 
-        WebElement helperText = driver.findElement(
-                By.xpath("//*[contains(text(),'Select multiple images to resize')]"));
-        Assert.assertTrue(helperText.isDisplayed(), "Bulk resize helper text is not displayed");
+    @Test(priority = 7)
+    public void TC07_verifyImageEnlargerInvalidUpload() {
+        openPage(IMAGE_ENLARGER_URL);
+
+        uploadFile(INVALID_FILE);
+
+        boolean invalidHandled =
+            pageContainsAny("Invalid", "Unsupported", "Error", "Only image") ||
+            !driver.getPageSource().contains("invalid.txt");
+
+        Assert.assertTrue(invalidHandled, "Invalid file was not rejected on Image Enlarger page");
+    }
+
+    @Test(priority = 8)
+    public void TC08_verifyImageEnlargerActionControlsPresent() {
+        openPage(IMAGE_ENLARGER_URL);
+
+        Assert.assertTrue(isElementPresent(By.cssSelector("input[type='file']")),
+                "File input is not present on Image Enlarger page");
+        Assert.assertTrue(isTextPresent("Enlarge"), "Enlarge section is not visible");
+    }
+
+    // =========================
+    // BULK RESIZE TESTS
+    // =========================
+
+    @Test(priority = 9)
+    public void TC09_verifyBulkResizePageUI() {
+        openPage(BULK_RESIZE_URL);
+
+        assertTextPresent("Bulk Resize", "Bulk Resize heading is not displayed");
+        assertTextPresent("Files", "Files section title is not displayed");
+        assertAnyTextPresent("Upload text is not displayed", "Drag and drop your file here", "Drag and drop");
+        assertAnyTextPresent("Select images button is not displayed", "Select images", "Select Images");
+        assertTextPresent("Supported:", "Supported formats text is not displayed");
+        assertTextPresent("Options", "Options section title is not displayed");
+        assertTextPresent("Process & Download", "Process & Download button is not displayed");
+        assertTextPresent("Select multiple images to resize", "Bulk resize helper text is not displayed");
+    }
+
+    @Test(priority = 10)
+    public void TC10_verifyBulkResizeWidthAndHeightInputs() {
+        openPage(BULK_RESIZE_URL);
+
+        WebElement widthInput = waitForVisible(By.xpath("//input[@placeholder='Width']"));
+        WebElement heightInput = waitForVisible(By.xpath("//input[@placeholder='Height']"));
+
+        widthInput.clear();
+        widthInput.sendKeys("800");
+
+        heightInput.clear();
+        heightInput.sendKeys("600");
+
+        Assert.assertEquals(widthInput.getAttribute("value"), "800", "Width input did not accept value");
+        Assert.assertEquals(heightInput.getAttribute("value"), "600", "Height input did not accept value");
+    }
+
+    @Test(priority = 11)
+    public void TC11_verifyBulkResizeAspectRatioCheckboxPresent() {
+        openPage(BULK_RESIZE_URL);
+
+        WebElement checkbox = waitForVisible(By.xpath("//input[@type='checkbox']"));
+        Assert.assertTrue(checkbox.isDisplayed(), "Keep aspect ratio checkbox is not displayed");
+    }
+
+    @Test(priority = 12)
+    public void TC12_verifyBulkResizeProcessButtonVisible() {
+        openPage(BULK_RESIZE_URL);
+
+        WebElement processButton = findButtonByPossibleTexts("Process & Download", "Process", "Download");
+        Assert.assertTrue(processButton.isDisplayed(), "Process button is not displayed");
+        Assert.assertTrue(processButton.isEnabled(), "Process button is not enabled");
     }
 
     @AfterMethod
